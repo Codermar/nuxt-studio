@@ -57,6 +57,8 @@ export const useStudio = createSharedComposable(() => {
     await draftDocuments.load()
     await draftMedias.load()
 
+    registerDocumentEditHandler({ host, documentTree, context, ui })
+
     host.app.requestRerender()
     isReady.value = true
 
@@ -94,8 +96,25 @@ export const useStudio = createSharedComposable(() => {
   }
 })
 
+function registerDocumentEditHandler({
+  host,
+  documentTree,
+  context,
+  ui,
+}: Pick<ReturnType<typeof useStudio>, 'host' | 'documentTree' | 'context' | 'ui'>) {
+  host.on.requestDocumentEdit(async (fsPath: string) => {
+    // Always route to Content tab when selecting from host website
+    if (context.currentFeature.value !== StudioFeature.Content) {
+      await context.switchFeature(StudioFeature.Content)
+    }
+
+    await documentTree.selectItemByFsPath(fsPath)
+    ui.open()
+  })
+}
+
 function initDevelopmentMode() {
-  const { host, documentTree, mediaTree, context, ui } = useStudio()
+  const { host, mediaTree, context } = useStudio()
   const aiEnabled = host.meta.ai?.enabled
   const aiContextFolder = host.meta.ai?.context?.contentFolder
   const hooks = useHooks()
@@ -148,15 +167,5 @@ function initDevelopmentMode() {
     }
 
     await hooks.callHook('studio:draft:media:updated', { caller: 'useStudio.on.mediaUpdate' })
-  })
-
-  host.on.requestDocumentEdit(async (fsPath: string) => {
-    // Always route to Content tab when selecting from host website
-    if (context.currentFeature.value !== StudioFeature.Content) {
-      await context.switchFeature(StudioFeature.Content)
-    }
-
-    await documentTree.selectItemByFsPath(fsPath)
-    ui.open()
   })
 }
